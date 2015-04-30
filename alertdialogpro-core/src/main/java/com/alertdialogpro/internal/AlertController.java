@@ -5,8 +5,10 @@ import android.content.DialogInterface;
 import android.content.res.TypedArray;
 import android.database.Cursor;
 import android.graphics.drawable.Drawable;
+import android.os.Build;
 import android.os.Handler;
 import android.os.Message;
+import android.support.v7.internal.widget.ContentFrameLayout;
 import android.text.TextUtils;
 import android.util.AttributeSet;
 import android.util.TypedValue;
@@ -190,8 +192,66 @@ public class AlertController {
     public void installContent() {
         /* We use a custom title so never request a window title */
         mWindow.requestFeature(Window.FEATURE_NO_TITLE);
-        mWindow.setContentView(mAlertDialogLayout);
+
+        /* On API 11 and below:
+         * Inflate the base DecorView of all dialogs,
+         * this is used to backport the windowMinWidthMajor,windowMinWidthMinor etc. attributes,
+         * in the same way AppCompat does
+         * */
+        if(Build.VERSION.SDK_INT < Build.VERSION_CODES.HONEYCOMB) {
+
+            //FitWindowsLinearLayout decorView = (FitWindowsLinearLayout) mWindow.getLayoutInflater().inflate(R.layout.adp_alert_dialog_base, null, false);
+            ContentFrameLayout frameLayout = (ContentFrameLayout) mWindow.getLayoutInflater().inflate(R.layout.adp_alert_dialog_base, null, false);
+
+            //ContentFrameLayout frameLayout = (ContentFrameLayout) mWindow.getDecorView();
+            LayoutInflater.from(frameLayout.getContext()).inflate(mAlertDialogLayout, frameLayout, true);
+            //mWindow.setContentView(mAlertDialogLayout);
+            mWindow.setContentView(frameLayout);
+
+            applyFixedSizeWindow(frameLayout);
+        } else {
+            mWindow.setContentView(mAlertDialogLayout);
+        }
+
+
         setupView();
+    }
+
+    private void applyFixedSizeWindow(ContentFrameLayout contentFrameLayout) {
+        /*
+        // This is a bit weird. In the framework, the window sizing attributes control
+        // the decor view's size, meaning that any padding is inset for the min/max widths below.
+        // We don't control measurement at that level, so we need to workaround it by making sure
+        // that the decor view's padding is taken into account.
+
+        contentFrameLayout.setDecorPadding(mWindowDecor.getPaddingLeft(),
+                mWindowDecor.getPaddingTop(), mWindowDecor.getPaddingRight(),
+                mWindowDecor.getPaddingBottom());
+        */
+
+        TypedArray a = contentFrameLayout.getContext().obtainStyledAttributes(R.styleable.Theme);
+        a.getValue(R.styleable.Theme_windowMinWidthMajor, contentFrameLayout.getMinWidthMajor());
+        a.getValue(R.styleable.Theme_windowMinWidthMinor, contentFrameLayout.getMinWidthMinor());
+
+        if (a.hasValue(R.styleable.Theme_windowFixedWidthMajor)) {
+            a.getValue(R.styleable.Theme_windowFixedWidthMajor,
+                    contentFrameLayout.getFixedWidthMajor());
+        }
+        if (a.hasValue(R.styleable.Theme_windowFixedWidthMinor)) {
+            a.getValue(R.styleable.Theme_windowFixedWidthMinor,
+                    contentFrameLayout.getFixedWidthMinor());
+        }
+        if (a.hasValue(R.styleable.Theme_windowFixedHeightMajor)) {
+            a.getValue(R.styleable.Theme_windowFixedHeightMajor,
+                    contentFrameLayout.getFixedHeightMajor());
+        }
+        if (a.hasValue(R.styleable.Theme_windowFixedHeightMinor)) {
+            a.getValue(R.styleable.Theme_windowFixedHeightMinor,
+                    contentFrameLayout.getFixedHeightMinor());
+        }
+        a.recycle();
+
+        contentFrameLayout.requestLayout();
     }
 
     public void setTitle(CharSequence title) {
